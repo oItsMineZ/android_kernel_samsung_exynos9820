@@ -166,16 +166,15 @@ toolchain ()
     echo "-- Checkout Toolchain Repo..."
     echo "---------------------------------------------------------"
 
-    git submodule add --branch aarch64-linux-android-4.9 --force https://github.com/oItsMineZKernel/toolchain toolchain/aarch64-linux-android-4.9
     git submodule add --branch clang-r416183b1 --force https://github.com/oItsMineZKernel/toolchain toolchain/clang-r416183b1
 
-    CLANG=$DIR/toolchain/clang-r416183b1/bin/
-    GCC=$DIR/toolchain/aarch64-linux-android-4.9/bin/aarch64-linux-androidkernel-
+    CLANG=$DIR/toolchain/clang-r416183b1
+    PATH=$CLANG/bin:$CLANG/lib:$PATH
     ARGS="
         ARCH=arm64 O=out \
-        CC=${CLANG}clang \
-        CLANG_TRIPLE=${CLANG}aarch64-linux-gnu- \
-        CROSS_COMPILE=$GCC
+        LLVM=1 LLVM_IAS=1 \
+        CC=clang \
+        READELF=$CLANG/bin/llvm-readelf \
     "
 }
 
