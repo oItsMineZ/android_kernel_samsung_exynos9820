@@ -1,0 +1,14 @@
+#####################################
+#  system.prop for oItsMineZKernel  #
+#####################################
+
+# Fake Encryption state to encrypted
+ro.crypto.state=encrypted
+
+# Quick Boot 
+ro.config.hw_quickpoweron=true
+
+# GPU vulkan-capable
+debug.composition.type=gpu
+
+# End of file
