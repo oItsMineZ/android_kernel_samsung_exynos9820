@@ -166,9 +166,9 @@ toolchain ()
     echo "-- Checkout Toolchain Repo..."
     echo "---------------------------------------------------------"
 
-    git submodule add --branch clang-r416183b1 --force https://github.com/oItsMineZKernel/toolchain toolchain/clang-r416183b1
+    git submodule add -f https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r433403b.git toolchain/clang-r433403b
 
-    CLANG=$DIR/toolchain/clang-r416183b1
+    CLANG=$DIR/toolchain/clang-r433403b
     PATH=$CLANG/bin:$CLANG/lib:$PATH
     ARGS="
         ARCH=arm64 O=out \
