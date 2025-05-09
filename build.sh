@@ -23,6 +23,7 @@ Options:
     -k, --ksu [y/N]        Include KernelSU Next with SuSFS (default: y)
     -h, --help             List all Build Script Command
     -c, --clean [y/N]      Reset all Change to Latest Commit [!! Your Uncommit Change will Lost !!] (default: n)
+    -l, --llvm [value]     Toolchain Clang Version (default: 14)
 EOF
 }
 
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --clean|-c)
             CLEAN="$2"
+            shift 2
+            ;;
+        --llvm|-l)
+            LLVM="$2"
             shift 2
             ;;
         *)\
@@ -162,19 +167,60 @@ kernelsu ()
 
 toolchain ()
 {
+    if [[ "$LLVM" == "12" ]]; then
+        HOST=hub # GitHub
+    else
+        HOST=lab # GitLab
+    fi
+
+    if [[ "$LLVM" == "12" ]]; then
+        CLANG=416183b # Clang 12.0.5
+    elif [[ "$LLVM" == "13" ]]; then
+        CLANG=433403b # Clang 13.0.3
+    elif [[ "$LLVM" == "14" ]] || [[ -z $LLVM ]]; then
+        CLANG=450784 # Clang 14.0.3
+    elif [[ "$LLVM" == "15" ]]; then
+        CLANG=468909b # Clang 15.0.3
+    elif [[ "$LLVM" == "16" ]]; then
+        CLANG=475365b # Clang 16.0.2
+    elif [[ "$LLVM" == "17" ]]; then
+        CLANG=498229b # Clang 17.0.4
+    else
+        CLANG=522817 # Clang 18.0.1
+    fi
+
+    if [[ "$LLVM" == "12" ]]; then
+        MINOR=".0.5"
+    elif [[ "$LLVM" == "13" ]] || [[ "$LLVM" == "14" ]] || [[ "$LLVM" == "15" ]]; then
+        MINOR=".0.3"
+    elif [[ "$LLVM" == "16" ]]; then
+        MINOR=".0.2"
+    elif [[ "$LLVM" == "17" ]]; then
+        MINOR=".0.4"
+    else
+        MINOR=".0.1"
+    fi
+
+    CLANG_VERSION="r$CLANG"
+    CLANG_INFO="Clang $LLVM$MINOR (Based on $CLANG_VERSION)"
+    TOOLCHAIN_PATH="toolchain/clang-$CLANG_VERSION"
+    TOOLCHAIN_URL="https://git$HOST.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-$CLANG_VERSION.git"
+
     echo "---------------------------------------------------------"
-    echo "-- Checkout Toolchain Repo..."
+    echo "-- Add $CLANG_INFO as Submodule..."
     echo "---------------------------------------------------------"
 
-    git submodule add -f https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r522817.git toolchain/clang-r522817
+    git submodule add -f "$TOOLCHAIN_URL" "$TOOLCHAIN_PATH"
 
-    CLANG=$DIR/toolchain/clang-r522817
-    PATH=$CLANG/bin:$CLANG/lib:$PATH
+    ORIGINAL_PATH=$PATH
+    CLANG_DIR="$DIR/$TOOLCHAIN_PATH"
+    PATH="$CLANG_DIR/bin:$CLANG_DIR/lib:$ORIGINAL_PATH"
+
     ARGS="
         ARCH=arm64 O=out \
         LLVM=1 LLVM_IAS=1 \
         CC=clang \
-        READELF=$CLANG/bin/llvm-readelf \
+        READELF=$CLANG_DIR/bin/llvm-readelf \
     "
 }
 
@@ -200,7 +246,7 @@ kernel ()
         echo "-- KernelSU Next with SuSFS: $KSU_NEXT"
     fi
 
-    sed -i "s/CONFIG_LOCALVERSION=\"\"/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-$DEVICE-$MODEL\"/" $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
+    sed -i "s/CONFIG_LOCALVERSION=\"\"/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-$DEVICE-$MODEL-Clang$LLVM\"/" $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
     sed -i "s/CONFIG_LOCALVERSION_AUTO=\"y\"/CONFIG_LOCALVERSION_AUTO=\"n\"/" $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
 
     if [ ! -z $RELEASE ]; then
@@ -328,7 +374,8 @@ build_zip ()
 
     sed -i "s/ui_print(\" Kernel Version: \");/ui_print(\" Kernel Version: $KERNEL_VERSION\");/" $DIR/build/out/$MODEL/zip/META-INF/com/google/android/updater-script
     sed -i "s/ui_print(\" Kernel Device: \");/ui_print(\" Kernel Device: $DEVICE ($MODEL)\");/" $DIR/build/out/$MODEL/zip/META-INF/com/google/android/updater-script
-    sed -i "s/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-"$DEVICE"-$MODEL\"/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-"$DATE"-"$DEVICE"-$MODEL\"/" $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
+    sed -i "s/ui_print(\" Kernel Toolchain: \");/ui_print(\" Kernel Toolchain: $CLANG_INFO\");/" $DIR/build/out/$MODEL/zip/META-INF/com/google/android/updater-script
+    sed -i "s/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-"$DEVICE"-$MODEL-Clang$LLVM\"/CONFIG_LOCALVERSION=\"-oItsMineZKernel-$KERNEL_VERSION-"$DATE"-"$DEVICE"-$MODEL-Clang$LLVM\"/" $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG
 
     NAME=$(grep -o 'CONFIG_LOCALVERSION="[^"]*"' $DIR/arch/arm64/configs/$KERNEL_DEFCONFIG | cut -d '"' -f 2)
     NAME=${NAME:1}.zip
